@@ -43,8 +43,8 @@
     "notes": "If enabled, only threads in whiteListThreadIds can use the bot."
   },
   "database": {
-    "type": "sqlite",
-    "uriMongodb": "MONGO_URI=mongodb+srv://devakashcodes_game:akashx404_game_db@gamedb.1pvxozl.mongodb.net/?appName=gameDB",
+    "type": "mongodb",
+    "uriMongodb": "mongodb+srv://devakashcodes_game:akashx404_game_db@gamedb.1pvxozl.mongodb.net/?appName=gameDB",
     "autoSyncWhenStart": false,
     "autoRefreshThreadInfoFirstTime": true,
     "notes": "Recommended using 'mongodb' or 'sqlite'."
