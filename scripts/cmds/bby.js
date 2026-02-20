@@ -1,212 +1,132 @@
-const axios = require("axios");
-const simsim = "https://simsimi-api-tjb1.onrender.com";
+const axios = require('axios');
 
-module.exports = {
-  config: {
-    name: "baby",
-    aliases: ["hippi"],
-    version: "2.0.0",
-    author: "rX",
-    countDown: 0,
-    role: 0,
-    shortDescription: "Cute AI Baby Chatbot (Auto Teach + Typing)",
-    longDescription: "Talk & Chat with Emotion — Auto teach enabled with typing effect.",
-    category: "box chat",
-    guide: {
-      en: "{p}baby [message]\n{p}baby teach [Question] - [Answer]\n{p}baby list"
+const baseApiUrl = async () => {
+  return "https://www.noobs-api.rf.gd/dipto";
+};
+
+module.exports.config = {
+  name: "bby",
+  aliases: ["baby", "bbe", "babe"],
+  version: "6.9.0",
+  author: "dipto👽",
+  countDown: 0,
+  role: 0,
+  description: "better than all sim simi",
+  category: "CHAT",
+  guide: {
+    en: "{pn} [anyMessage] OR\nteach [YourMessage] - [Reply1], [Reply2], [Reply3]... OR\nremove [YourMessage] OR\nmsg [YourMessage] OR\nlist OR \nedit [YourMessage] - [NewMessage] OR\nUse --font=2 for different font styles."
+  }
+};
+
+module.exports.onStart = async ({ api, event, args, usersData }) => {
+  const link = `${await baseApiUrl()}/baby`;
+  let dipto = args.join(" ").toLowerCase();
+  const uid = event.senderID;
+  let font = "1"; 
+
+  if (dipto.includes("--font=")) {
+    const match = dipto.match(/--font=(\d+)/);
+    if (match) {
+      font = match[1];
+      dipto = dipto.replace(match[0], "").trim();
     }
-  },
+  }
 
-  // ─────────────── MAIN COMMAND ───────────────
-  onStart: async function ({ api, event, args, message, usersData }) {
-    const senderID = event.senderID;
-    const senderName = await usersData.getName(senderID);
-    const query = args.join(" ").trim().toLowerCase();
-    const threadID = event.threadID;
-    const messageID = event.messageID;
+  try {
+    if (!args[0]) {
+      const ran = ["Bolo baby", "hum", "type help baby", "type !baby hi"];
+      return api.sendMessage(ran[Math.floor(Math.random() * ran.length)], event.threadID, event.messageID);
+    }
 
-    // --- Typing System ---
-    const sendTyping = async () => {
-      try {
-        if (typeof api.sendTypingIndicatorV2 === "function") {
-          await api.sendTypingIndicatorV2(true, threadID);
-          await new Promise(r => setTimeout(r, 3000));
-          await api.sendTypingIndicatorV2(false, threadID);
-        } else {
-          console.error("❌ Typing unsupported: sendTypingIndicatorV2 not found");
-        }
-      } catch (err) {
-        console.error("❌ Typing error:", err.message);
-      }
-    };
+    if (dipto === "tmr boss ke") {
+      return api.sendMessage("𝐁𝐀𝐘𝐉𝐈𝐃", event.threadID, event.messageID);
+    }
 
-    try {
-      if (!query) {
-        await sendTyping();
-        const ran = ["Bolo baby 💖", "Hea baby 😚"];
-        const r = ran[Math.floor(Math.random() * ran.length)];
-        return message.reply(r, (err, info) => {
-          if (!err) {
-            global.GoatBot.onReply.set(info.messageID, { commandName: "baby", author: senderID });
-          }
+    const response = await axios.get(`${link}?text=${dipto}&senderID=${uid}&font=${font}`);
+    const replyText = response.data.reply.replace(/rubish/gi, "𝐁𝐀𝐘𝐉𝐈𝐃");
+
+    api.sendMessage(replyText, event.threadID, (error, info) => {
+      global.GoatBot.onReply.set(info.messageID, {
+        commandName: module.exports.config.name,
+        type: "reply",
+        messageID: info.messageID,
+        author: event.senderID,
+        replyText,
+        apiUrl: link
+      });
+    }, event.messageID);
+  } catch (e) {
+    console.log(e);
+    api.sendMessage("Check console for error", event.threadID, event.messageID);
+  }
+};
+
+module.exports.onReply = async ({ api, event, Reply }) => {
+  try {
+    if (event.type === "message_reply") {
+      const response = await axios.get(`${await baseApiUrl()}/baby?text=${encodeURIComponent(event.body?.toLowerCase())}&senderID=${event.senderID}&font=1`);
+      const replyText = response.data.reply.replace(/rubish/gi, "Bayjid");
+
+      await api.sendMessage(replyText, event.threadID, (error, info) => {
+        global.GoatBot.onReply.set(info.messageID, {
+          commandName: module.exports.config.name,
+          type: "reply",
+          messageID: info.messageID,
+          author: event.senderID,
+          replyText
         });
-      }
+      }, event.messageID);
+    }
+  } catch (err) {
+    return api.sendMessage(`Error: ${err.message}`, event.threadID, event.messageID);
+  }
+};
 
-      // ─── Teach command ───
-      if (args[0] === "teach") {
-        const parts = query.replace("teach ", "").split(" - ");
-        if (parts.length < 2)
-          return message.reply("Use: baby teach [Question] - [Reply]");
-        const [ask, ans] = parts;
-        const res = await axios.get(`${simsim}/teach?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}&senderName=${encodeURIComponent(senderName)}`);
-        return message.reply(res.data.message || "Learned successfully!");
-      }
+module.exports.onChat = async ({ api, event }) => {
+  try {
+    let body = event.body ? event.body.toLowerCase() : "";
+    let font = "1";
 
-      // ─── List command ───
-      if (args[0] === "list") {
-        const res = await axios.get(`${simsim}/list`);
-        if (res.data.code === 200)
-          return message.reply(`♾ Total Questions: ${res.data.totalQuestions}\n★ Replies: ${res.data.totalReplies}\n👑 Author: ${res.data.author}`);
-        else
-          return message.reply(`Error: ${res.data.message || "Failed to fetch list"}`);
+    if (body.includes("--font=")) {
+      const match = body.match(/--font=(\d+)/);
+      if (match) {
+        font = match[1];
+        body = body.replace(match[0], "").trim();
       }
+    }
 
-      // ─── Normal chat ───
-      await sendTyping();
-      const res = await axios.get(`${simsim}/simsimi?text=${encodeURIComponent(query)}&senderName=${encodeURIComponent(senderName)}`);
-      const responses = Array.isArray(res.data.response) ? res.data.response : [res.data.response];
-      if (!responses || responses.length === 0) {
-        console.log(`🤖 Auto-teaching new phrase: "${query}"`);
-        await axios.get(`${simsim}/teach?ask=${encodeURIComponent(query)}&ans=${encodeURIComponent("hmm baby 😚 (auto learned)")}&senderName=${encodeURIComponent(senderName)}`);
-        return message.reply("hmm baby 😚");
-      }
+    if (body.startsWith("baby") || body.startsWith("bby") || body.startsWith("janu")) {
+      const arr = body.replace(/^\S+\s*/, "");
 
-      for (const reply of responses) {
-        await new Promise((resolve) => {
-          message.reply(reply, (err, info) => {
-            if (!err) {
-              global.GoatBot.onReply.set(info.messageID, { commandName: "baby", author: senderID });
-            }
-            resolve();
+      if (!arr) {
+        return api.sendMessage("ki hoise 👽🎀", event.threadID, (error, info) => {
+          global.GoatBot.onReply.set(info.messageID, {
+            commandName: module.exports.config.name,
+            type: "reply",
+            messageID: info.messageID,
+            author: event.senderID
           });
+        }, event.messageID);
+      }
+
+      if (arr === "tmr boss ke") {
+        return api.sendMessage("𝐁𝐀𝐘𝐉𝐈𝐃", event.threadID, event.messageID);
+      }
+
+      const response = await axios.get(`${await baseApiUrl()}/baby?text=${encodeURIComponent(arr)}&senderID=${event.senderID}&font=${font}`);
+      const replyText = response.data.reply.replace(/rubish/gi, "𝐁𝐀𝐘𝐉𝐈𝐃");
+
+      await api.sendMessage(replyText, event.threadID, (error, info) => {
+        global.GoatBot.onReply.set(info.messageID, {
+          commandName: module.exports.config.name,
+          type: "reply",
+          messageID: info.messageID,
+          author: event.senderID,
+          replyText
         });
-      }
-
-    } catch (err) {
-      console.error("❌ Baby main error:", err);
-      message.reply(`Error in baby command: ${err.message}`);
+      }, event.messageID);
     }
-  },
-
-  // ─────────────── HANDLE REPLY ───────────────
-  onReply: async function ({ api, event, Reply, message, usersData }) {
-    const threadID = event.threadID;
-    const messageID = event.messageID;
-    const senderName = await usersData.getName(event.senderID);
-    const replyText = event.body ? event.body.trim().toLowerCase() : "";
-
-    const sendTyping = async () => {
-      try {
-        if (typeof api.sendTypingIndicatorV2 === "function") {
-          await api.sendTypingIndicatorV2(true, threadID);
-          await new Promise(r => setTimeout(r, 3000));
-          await api.sendTypingIndicatorV2(false, threadID);
-        }
-      } catch (err) {
-        console.error("❌ Typing error:", err.message);
-      }
-    };
-
-    try {
-      if (!replyText) return;
-
-      await sendTyping();
-      const res = await axios.get(`${simsim}/simsimi?text=${encodeURIComponent(replyText)}&senderName=${encodeURIComponent(senderName)}`);
-      const responses = Array.isArray(res.data.response) ? res.data.response : [res.data.response];
-
-      // যদি SimSimi কিছু না পায়, auto-teach করে
-      if (!responses || responses.length === 0) {
-        console.log(`🧠 Auto-teaching new reply: "${replyText}"`);
-        await axios.get(`${simsim}/teach?ask=${encodeURIComponent(replyText)}&ans=${encodeURIComponent("hmm baby 😚 (auto learned)")}&senderName=${encodeURIComponent(senderName)}`);
-        return message.reply("hmm baby 😚");
-      }
-
-      for (const reply of responses) {
-        await new Promise((resolve) => {
-          message.reply(reply, (err, info) => {
-            if (!err) {
-              global.GoatBot.onReply.set(info.messageID, { commandName: "baby", author: event.senderID });
-            }
-            resolve();
-          });
-        });
-      }
-
-    } catch (err) {
-      console.error("❌ Baby reply error:", err);
-      message.reply(`Error in baby reply: ${err.message}`);
-    }
-  },
-
-  // ─────────────── AUTO CHAT TRIGGER ───────────────
-  onChat: async function ({ api, event, message, usersData }) {
-    const raw = event.body ? event.body.toLowerCase().trim() : "";
-    if (!raw) return;
-
-    const senderName = await usersData.getName(event.senderID);
-    const senderID = event.senderID;
-    const threadID = event.threadID;
-
-    const sendTyping = async () => {
-      try {
-        if (typeof api.sendTypingIndicatorV2 === "function") {
-          await api.sendTypingIndicatorV2(true, threadID);
-          await new Promise(r => setTimeout(r, 3000));
-          await api.sendTypingIndicatorV2(false, threadID);
-        }
-      } catch (err) {
-        console.error("❌ Typing error:", err.message);
-      }
-    };
-
-    try {
-      const simpleTriggers = ["baby", "bot", "bby", "বেবি", "বট", "oi", "oii", "jan"];
-      if (simpleTriggers.includes(raw)) {
-        await sendTyping();
-        const replies = ["ডাকো কেন 🥺 প্রেম করবা নাকি 😞", "বুকাচুদা আর কত বট বট করবি 🐸", "ওই জান কাছে আসো 🫦👅", "আলাবু বলো সোনা 🤧", "আকাশ কে দেখছো? 🥺 তাকে কোথাও খুজে পাচ্ছি না 😩", "তুমার নুনুতে উম্মাহ 🥺🤌", "হ্যাঁ গো জান বলো 🙂", "ডাকিস না, তুই পচা 😼"];
-        const reply = replies[Math.floor(Math.random() * replies.length)];
-        return message.reply(reply, (err, info) => {
-          if (!err) global.GoatBot.onReply.set(info.messageID, { commandName: "baby", author: senderID });
-        });
-      }
-
-      // যদি “baby [text]” হয়
-      const prefixes = ["baby ", "bot ", "বেবি ", "বট ", "jan"];
-      const prefix = prefixes.find(p => raw.startsWith(p));
-      if (prefix) {
-        const query = raw.replace(prefix, "").trim();
-        if (!query) return;
-        await sendTyping();
-        const res = await axios.get(`${simsim}/simsimi?text=${encodeURIComponent(query)}&senderName=${encodeURIComponent(senderName)}`);
-        const responses = Array.isArray(res.data.response) ? res.data.response : [res.data.response];
-
-        if (!responses || responses.length === 0) {
-          console.log(`🧠 Auto-learned: "${query}"`);
-          await axios.get(`${simsim}/teach?ask=${encodeURIComponent(query)}&ans=${encodeURIComponent("hmm baby 😚 (auto learned)")}&senderName=${encodeURIComponent(senderName)}`);
-          return message.reply("hmm baby 😚");
-        }
-
-        for (const reply of responses) {
-          await new Promise((resolve) => {
-            message.reply(reply, (err, info) => {
-              if (!err) global.GoatBot.onReply.set(info.messageID, { commandName: "baby", author: senderID });
-              resolve();
-            });
-          });
-        }
-      }
-    } catch (err) {
-      console.error("❌ Baby onChat error:", err);
-    }
+  } catch (err) {
+    return api.sendMessage(`Error: ${err.message}`, event.threadID, event.messageID);
   }
 };
